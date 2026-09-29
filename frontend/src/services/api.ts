@@ -6,6 +6,16 @@ export interface PredictionRequest {
   sequence: string;
 }
 
+export interface ClinicalInsight {
+  summary: string;
+  biological_mechanism: string;
+  pathogenicity_tier: string;
+  clinical_recommendations: string[];
+  confirmatory_tests: string[];
+  hatchable_cloud_active: boolean;
+  generated_at: string;
+}
+
 export interface PredictionResponse {
   prediction: string;
   confidence: number;
@@ -14,6 +24,17 @@ export interface PredictionResponse {
   at_content?: number;
   model_used?: string;
   timestamp?: string;
+  clinical_insight?: ClinicalInsight | null;
+}
+
+export interface HatchableStatus {
+  status: string;
+  connected: boolean;
+  mcp_url: string;
+  tools_available: number;
+  masked_api_key?: string | null;
+  error?: string | null;
+  timestamp: string;
 }
 
 export const predictSequence = async (
@@ -41,4 +62,11 @@ export const predictSequence = async (
     }
     throw new Error(error.message || 'An unexpected error occurred during prediction.');
   }
+};
+
+export const getHatchableStatus = async (): Promise<HatchableStatus> => {
+  const response = await axios.get<HatchableStatus>(
+    `${API_BASE_URL}/api/hatchable/status`
+  );
+  return response.data;
 };

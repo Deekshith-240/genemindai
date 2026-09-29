@@ -132,3 +132,64 @@ def test_sequence_with_whitespace(client: TestClient) -> None:
     assert "prediction" in data
     assert "confidence" in data
     assert 0.0 <= data["confidence"] <= 1.0
+
+
+def test_hatchable_status_endpoint(client: TestClient) -> None:
+    """Verify GET /api/hatchable/status reports connection status without leaking raw secret."""
+    response = client.get("/api/hatchable/status")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "connected" in data
+    assert "mcp_url" in data
+    assert "tools_available" in data
+    assert "status" in data
+
+    # Verify security: raw secret key must NEVER be in response
+    resp_text = response.text
+    assert "hb_SSTdjWx8ZzE1K70KFTaiG6Z2nzwLlmEWifjAbjaD" not in resp_text
+
+
+def test_hatchable_clinical_insight_endpoint(client: TestClient) -> None:
+    """Verify POST /api/hatchable/clinical-insight generates structured clinical advisory."""
+    payload = {
+        "prediction": "Beta Thalassemia",
+        "confidence": 0.96,
+        "sequence_length": 1608,
+        "gc_content": 40.11,
+        "at_content": 59.89,
+    }
+    response = client.post("/api/hatchable/clinical-insight", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "summary" in data
+    assert "biological_mechanism" in data
+    assert "pathogenicity_tier" in data
+    assert "clinical_recommendations" in data
+    assert isinstance(data["clinical_recommendations"], list)
+    assert len(data["clinical_recommendations"]) > 0
+    assert "confirmatory_tests" in data
+    assert isinstance(data["confirmatory_tests"], list)
+
+
+def test_prediction_includes_clinical_insight_without_exposing_secrets(
+    client: TestClient,
+) -> None:
+    """Verify POST /predict returns enriched clinical insight while shielding sensitive credentials."""
+    valid_sequence = (
+        "ACATTTGCTTCTGACACAACTGTGTTCACTAGCAACCTCAAACAGACACCATGGTGCAT"
+    )
+    response = client.post("/predict", json={"sequence": valid_sequence})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "clinical_insight" in data
+    if data["clinical_insight"]:
+        insight = data["clinical_insight"]
+        assert "summary" in insight
+        assert "biological_mechanism" in insight
+        assert "pathogenicity_tier" in insight
+
+    # Verify security: raw secret key must NEVER be in response
+    assert "hb_SSTdjWx8ZzE1K70KFTaiG6Z2nzwLlmEWifjAbjaD" not in response.text

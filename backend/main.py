@@ -1,7 +1,8 @@
 """
 FastAPI REST API server for GeneMindAI DNA sequence mutation analysis.
 
-Exposes endpoints to health check the service and run real-time sequence prediction.
+Exposes endpoints to health check the service, run real-time sequence prediction,
+and access server-side Hatchable AI clinical genomic insights.
 """
 
 from __future__ import annotations
@@ -12,7 +13,6 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from fastapi import FastAPI, HTTPException, status
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -21,28 +21,44 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.schemas import PredictionRequest, PredictionResponse
+from backend.schemas import (
+    ClinicalInsight,
+    ClinicalInsightRequest,
+    HatchableStatusResponse,
+    PredictionRequest,
+    PredictionResponse,
+)
+from backend.services.hatchable_service import HatchableService
 from backend.services.predictor import (
     InvalidDNASequenceError,
     Predictor,
     PredictorError,
 )
 
-# Global predictor instance initialized during application startup
+# Global services initialized during application startup
 predictor_service: Optional[Predictor] = None
+hatchable_service: Optional[HatchableService] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle manager to load model once at startup."""
-    global predictor_service
+    """Lifecycle manager to load models and services once at startup."""
+    global predictor_service, hatchable_service
     try:
         predictor_service = Predictor()
     except Exception as exc:
         print(f"Error initializing predictor service: {exc}", file=sys.stderr)
         predictor_service = None
+
+    try:
+        hatchable_service = HatchableService()
+    except Exception as exc:
+        print(f"Error initializing hatchable service: {exc}", file=sys.stderr)
+        hatchable_service = None
+
     yield
     predictor_service = None
+    hatchable_service = None
 
 
 app = FastAPI(
@@ -76,6 +92,62 @@ async def root() -> Dict[str, str]:
     return {"message": "GeneMindAI API Running"}
 
 
+@app.get(
+    "/api/hatchable/status",
+    response_model=HatchableStatusResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_hatchable_status() -> HatchableStatusResponse:
+    """
+    Check the server-side Hatchable MCP connection status.
+
+    Returns:
+        HatchableStatusResponse with connection health and available cloud tools,
+        without ever exposing the secret API key.
+    """
+    if hatchable_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Hatchable service is not initialized.",
+        )
+
+    status_data = await hatchable_service.check_connection()
+    return HatchableStatusResponse(**status_data)
+
+
+@app.post(
+    "/api/hatchable/clinical-insight",
+    response_model=ClinicalInsight,
+    status_code=status.HTTP_200_OK,
+)
+async def get_clinical_insight(
+    request: ClinicalInsightRequest,
+) -> ClinicalInsight:
+    """
+    Generate an AI clinical genomic advisory interpretation for a given classification result.
+
+    Args:
+        request: ClinicalInsightRequest containing prediction, confidence, and sequence metrics.
+
+    Returns:
+        ClinicalInsight response.
+    """
+    if hatchable_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Hatchable service is not initialized.",
+        )
+
+    insight_dict = await hatchable_service.generate_clinical_insight(
+        prediction=request.prediction,
+        confidence=request.confidence,
+        sequence_length=request.sequence_length,
+        gc_content=request.gc_content,
+        at_content=request.at_content,
+    )
+    return ClinicalInsight(**insight_dict)
+
+
 @app.post(
     "/predict",
     response_model=PredictionResponse,
@@ -85,13 +157,14 @@ async def predict_dna_sequence(
     request: PredictionRequest,
 ) -> PredictionResponse:
     """
-    Predict mutation status for a given DNA sequence.
+    Predict mutation status for a given DNA sequence and augment with clinical insight.
 
     Args:
         request: PredictionRequest containing the DNA sequence.
 
     Returns:
-        PredictionResponse containing classification label and confidence score.
+        PredictionResponse containing classification label, confidence score,
+        sequence metrics, and server-side Hatchable AI clinical insights.
 
     Raises:
         HTTPException 400: If the DNA sequence is invalid.
@@ -104,8 +177,7 @@ async def predict_dna_sequence(
         )
 
     try:
-        result_dict = predictor_service.predict(request.sequence)
-        return PredictionResponse(**result_dict)
+        result_dict = dict(predictor_service.predict(request.sequence))
     except InvalidDNASequenceError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -116,3 +188,20 @@ async def predict_dna_sequence(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         ) from exc
+
+    # Enforce server-side AI Clinical Insight enrichment
+    if hatchable_service is not None:
+        try:
+            insight_dict = await hatchable_service.generate_clinical_insight(
+                prediction=result_dict.get("prediction", ""),
+                confidence=float(result_dict.get("confidence", 0.0)),
+                sequence_length=int(result_dict.get("sequence_length", 0)),
+                gc_content=result_dict.get("gc_content"),
+                at_content=result_dict.get("at_content"),
+            )
+            result_dict["clinical_insight"] = insight_dict
+        except Exception as exc:
+            print(f"Warning: Failed to generate clinical insight: {exc}", file=sys.stderr)
+            result_dict["clinical_insight"] = None
+
+    return PredictionResponse(**result_dict)

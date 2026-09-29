@@ -8,8 +8,14 @@ import {
   Activity,
   FileCheck2,
   Sparkles,
+  Stethoscope,
+  Microscope,
+  ClipboardList,
+  ShieldCheck,
+  Cloud,
 } from 'lucide-react';
 import { ConfidenceBar } from './ConfidenceBar';
+import { ClinicalInsight } from '../services/api';
 
 interface PredictionCardProps {
   prediction: string;
@@ -19,6 +25,7 @@ interface PredictionCardProps {
   atContent?: number;
   modelUsed?: string;
   timestamp?: string;
+  clinicalInsight?: ClinicalInsight | null;
 }
 
 export const PredictionCard: React.FC<PredictionCardProps> = ({
@@ -29,6 +36,7 @@ export const PredictionCard: React.FC<PredictionCardProps> = ({
   atContent,
   modelUsed = 'Random Forest',
   timestamp,
+  clinicalInsight,
 }) => {
   const isMutated =
     prediction.toLowerCase().includes('mutated') ||
@@ -127,6 +135,97 @@ export const PredictionCard: React.FC<PredictionCardProps> = ({
             </div>
           </div>
         </div>
+
+        {/* AI Clinical Genomic Advisory (Server-Side Hatchable AI Integration) */}
+        {clinicalInsight && (
+          <div className="space-y-4 pt-4 border-t border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                <Stethoscope className="w-4 h-4" />
+                AI Clinical & Genomic Interpretation
+              </h4>
+
+              <div className="flex items-center gap-2">
+                {clinicalInsight.hatchable_cloud_active && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    <Cloud className="w-3 h-3 text-cyan-400" />
+                    Hatchable Cloud AI
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  Server-Side Secured
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-5 space-y-4">
+              {/* Executive Summary */}
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                  Executive Summary
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed">
+                  {clinicalInsight.summary}
+                </p>
+              </div>
+
+              {/* Pathogenicity Tier */}
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                  Pathogenicity Classification
+                </div>
+                <div
+                  className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${
+                    isMutated
+                      ? 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                      : 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                  }`}
+                >
+                  {clinicalInsight.pathogenicity_tier}
+                </div>
+              </div>
+
+              {/* Biological Mechanism */}
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1 flex items-center gap-1.5">
+                  <Microscope className="w-3.5 h-3.5 text-cyan-400" />
+                  Molecular Mechanism
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                  {clinicalInsight.biological_mechanism}
+                </p>
+              </div>
+
+              {/* Clinical Recommendations & Confirmatory Tests */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                <div className="bg-slate-900/40 p-3.5 rounded-lg border border-slate-800/70">
+                  <div className="text-[11px] uppercase tracking-wider text-cyan-400 font-semibold mb-2 flex items-center gap-1.5">
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    Clinical Recommendations
+                  </div>
+                  <ul className="space-y-1.5 text-xs text-slate-300 list-disc list-inside">
+                    {clinicalInsight.clinical_recommendations.map((rec, idx) => (
+                      <li key={idx} className="leading-snug">{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="bg-slate-900/40 p-3.5 rounded-lg border border-slate-800/70">
+                  <div className="text-[11px] uppercase tracking-wider text-cyan-400 font-semibold mb-2 flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5" />
+                    Confirmatory Assays
+                  </div>
+                  <ul className="space-y-1.5 text-xs text-slate-300 list-disc list-inside">
+                    {clinicalInsight.confirmatory_tests.map((test, idx) => (
+                      <li key={idx} className="leading-snug">{test}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Model Metadata & Generation Tagline */}
         <div className="bg-slate-950/50 border border-slate-800/80 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-300">

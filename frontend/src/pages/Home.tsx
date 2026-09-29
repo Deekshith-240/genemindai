@@ -122,6 +122,7 @@ export const Home: React.FC = () => {
             atContent={result.at_content}
             modelUsed={result.model_used}
             timestamp={result.timestamp}
+            clinicalInsight={result.clinical_insight}
           />
           <ShapViewer />
         </div>
