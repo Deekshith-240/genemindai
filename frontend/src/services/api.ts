@@ -1,0 +1,44 @@
+import axios from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+export interface PredictionRequest {
+  sequence: string;
+}
+
+export interface PredictionResponse {
+  prediction: string;
+  confidence: number;
+  sequence_length?: number;
+  gc_content?: number;
+  at_content?: number;
+  model_used?: string;
+  timestamp?: string;
+}
+
+export const predictSequence = async (
+  sequence: string
+): Promise<PredictionResponse> => {
+  try {
+    const response = await axios.post<PredictionResponse>(
+      `${API_BASE_URL}/predict`,
+      { sequence }
+    );
+    return response.data;
+  } catch (error: any) {
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        const detail = error.response.data?.detail;
+        if (typeof detail === 'string') {
+          throw new Error(detail);
+        }
+        throw new Error(`Server returned HTTP ${error.response.status}`);
+      } else if (error.request) {
+        throw new Error(
+          'API service is currently unavailable. Please check backend server connection.'
+        );
+      }
+    }
+    throw new Error(error.message || 'An unexpected error occurred during prediction.');
+  }
+};
