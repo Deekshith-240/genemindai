@@ -19,3 +19,10 @@ frontend/build/
 .vscode/
 .idea/
 *.swp
+
+# Environment & API Secrets
+.env
+*.env
+.agents/mcp_config.json
+.cursor/mcp.json
+mcp_config.json
